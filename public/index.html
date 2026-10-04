@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Sirkula - Student App</title>
+  
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="mesh-bg"></div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- 1. SPLASH SCREEN -->
+  <div id="viewSplash" class="screen-full">
+    <div class="splash-graphic">
+      <div class="circle-bg bouncy-anim">
+        <span style="font-size: 80px;">♻️</span>
+      </div>
+    </div>
+    <div class="splash-text">
+      <h1>Smarter<br>Recycling.</h1>
+      <p data-i18n="splashSub">Lacak sampahmu, kumpulkan poin, dan jadi pahlawan bumi bersama Sirkula.</p>
+    </div>
+    <div style="width: 100%; padding: 0 20px;">
+      <button class="btn-primary btn-large bouncy" id="btnLanjutSplash"><span data-i18n="btnGetStarted">Get Started</span> <i class="ph-bold ph-arrow-right"></i></button>
+    </div>
+  </div>
+
+  <!-- 2. LOGIN / SIGNUP SCREEN -->
+  <div id="viewLogin" class="screen hidden">
+    <div class="glass-card" style="padding: 30px 20px;">
+      <div class="login-header">
+        <div class="icon-box"><span style="font-size: 40px;">👋</span></div>
+        <h2 data-i18n="welcomeTitle">Selamat Datang!</h2>
+        <p data-i18n="welcomeSub">Mulai perjalanan sirkularmu di sekolah.</p>
+      </div>
+
+      <div class="auth-tabs">
+        <div class="auth-tab active" id="tabLogin" onclick="switchAuthMode('login')" data-i18n="tabLogin">Masuk</div>
+        <div class="auth-tab" id="tabSignup" onclick="switchAuthMode('signup')" data-i18n="tabRegister">Daftar</div>
+      </div>
+
+      <!-- FORM LOGIN -->
+      <div id="formLogin">
+        <div class="form-group"><label data-i18n="lblEmailPhone">Email / No. Telp</label><input type="text" id="logId" placeholder="Masukkan email/no telp"></div>
+        <div class="form-group"><label data-i18n="lblPassword">Kata Sandi</label><input type="password" id="logPass" placeholder="Masukkan kata sandi"></div>
+        <button class="btn-primary bouncy" id="btnProsesLogin" style="margin-top: 20px;" data-i18n="btnLoginNow">Masuk Sekarang</button>
+      </div>
+
+      <!-- FORM SIGNUP -->
+      <div id="formSignup" class="hidden">
+        <div class="form-group"><label data-i18n="lblFullName">Nama Lengkap</label><input type="text" id="regName" placeholder="Contoh: Budi Santoso"></div>
+        <div class="form-group"><label data-i18n="lblSchool">Asal Sekolah</label><input type="text" id="regSchool" placeholder="Contoh: SMAN 15 Bandung"></div>
+        <div class="form-group"><label data-i18n="lblClass">Kelas</label><input type="text" id="regClass" placeholder="Contoh: XII MIPA 2"></div>
+        <div class="form-group"><label data-i18n="lblRegEmail">Email</label><input type="email" id="regEmail" placeholder="contoh@email.com"></div>
+        <div class="form-group"><label data-i18n="lblRegPass">Kata Sandi</label><input type="password" id="regPass" placeholder="Buat kata sandi akun"></div>
+        <button class="btn-primary bouncy" id="btnProsesSignup" style="margin-top: 20px;" data-i18n="btnRegNow">Daftar Akun Baru</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. VIEW: HOME -->
+  <div id="viewHome" class="screen-scroll hidden">
+    <div class="modern-header">
+      <div class="header-user">
+        <div class="avatar"><i class="ph-fill ph-user"></i></div>
+        <div>
+          <p class="greeting" data-i18n="greeting">Halo, KulaMates!</p>
+          <h2 id="txtUser">Siswa</h2>
+        </div>
+      </div>
+      <div class="header-icons">
+        <div class="streak-badge bouncy" onclick="showToast('Selesaikan misi harian untuk jaga Streak-mu!', 'success')">
+          🔥 <span id="txtStreak">0</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="glass-card progress-card bouncy" onclick="tampilkanShareCard()">
+      <div class="pc-content">
+        <p><i class="ph-bold ph-lightning"></i> <span data-i18n="levelLabel">Level Kamu (Klik)</span></p>
+        <h2 id="badgeTitle">Kula Starter</h2>
+      </div>
+      <div class="pc-circle" id="badgeIcon" style="font-size: 35px;">🌱</div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="glass-card stat-box bouncy">
+        <p data-i18n="statTotalPts">Total Poin</p>
+        <h3 id="txtPts" style="color: var(--brand-color);">0</h3>
+      </div>
+      <div class="glass-card stat-box bouncy">
+        <p data-i18n="statPet">Botol (PET)</p>
+        <h3 id="statPetVal">0</h3>
+      </div>
+      <div class="glass-card stat-box bouncy">
+        <p data-i18n="statMl">Sachet (ML)</p>
+        <h3 id="statMlVal">0</h3>
+      </div>
+    </div>
+
+    <h3 class="section-title"><span data-i18n="miniBoardTitle">Mini Leaderboard</span> <span style="font-size:12px; color:var(--brand-color); font-weight:normal; float:right;">Top 3</span></h3>
+    <div class="glass-card" style="padding: 15px; margin-bottom: 25px;">
+      <div id="miniLeaderboard"></div>
+    </div>
+
+    <h3 class="section-title" data-i18n="impactTitle">Dampak Lingkungan</h3>
+    <div class="impact-list">
+      <div class="glass-card impact-row bouncy">
+        <div class="impact-icon" style="background:rgba(2, 132, 199, 0.1); color:#0284c7;">💧</div>
+        <div class="impact-text"><strong data-i18n="impWaterTitle">Air Bersih Terjaga</strong><span data-i18n="impWaterDesc">Volume air diselamatkan</span></div>
+        <div class="impact-val" id="impWater">0 L</div>
+      </div>
+      <div class="glass-card impact-row bouncy">
+        <div class="impact-icon" style="background:rgba(22, 101, 52, 0.1); color:#166534;">☁️</div>
+        <div class="impact-text"><strong data-i18n="impCarbonTitle">Cegah Karbon</strong><span data-i18n="impCarbonDesc">Emisi CO2 dihindari</span></div>
+        <div class="impact-val" id="impCarbon">0 Kg</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. VIEW: RANKING -->
+  <div id="viewRank" class="screen-scroll hidden">
+    <div class="page-header"><h2 data-i18n="rankTitle">Leaderboard</h2><p data-i18n="rankSub">Top Kontributor di Sekolahmu</p></div>
+    <div class="podium-container">
+      <div class="glass-card podium-box silver bouncy"><div class="avatar-podium">SJ</div><h4>Salsa</h4><p>420 Pts</p></div>
+      <div class="glass-card podium-box gold bouncy"><div style="font-size:30px; position:absolute; top:-20px; left:50%; transform:translateX(-50%);">👑</div><div class="avatar-podium" style="border-color:#eab308;">RA</div><h4>Raka</h4><p>550 Pts</p></div>
+      <div class="glass-card podium-box bronze bouncy"><div class="avatar-podium">DI</div><h4>Dika</h4><p>310 Pts</p></div>
+    </div>
+    <div class="rank-list">
+      <div class="glass-card rank-item my-rank bouncy">
+        <div class="rank-num">#</div>
+        <div class="rank-info"><strong><span data-i18n="youLabel">Kamu</span> (<span id="rankMyName">Siswa</span>)</strong><span id="rankMyBadge">Kula Starter</span></div>
+        <div class="rank-pts" id="rankMyPts">0 Pts</div>
+      </div>
+      <div class="glass-card rank-item bouncy"><div class="rank-num">4</div><div class="rank-info"><strong>Bima (XI IPS)</strong><span>Eco Ranger</span></div><div class="rank-pts">280 Pts</div></div>
+    </div>
+  </div>
+
+  <!-- 5. VIEW: REWARD -->
+  <div id="viewReward" class="screen-scroll hidden">
+    <div class="page-header"><h2 data-i18n="rewardTitle">Tukar Reward</h2><p><span data-i18n="rewardPtsLabel">Saldo Poin</span>: <strong style="color:var(--brand-color);" id="rewMyPts">0 Pts</strong></p></div>
+    <div id="rewardBanner" class="glass-card reward-banner inactive bouncy">
+      <div class="reward-icon-large"><i class="ph-fill ph-lock-key"></i></div>
+      <h3 class="reward-title" data-i18n="rewardInactiveTitle">Musim Reward Belum Dimulai</h3>
+      <p class="reward-desc" id="rewardDescText" data-i18n="rewardInactiveDesc">Kumpulkan poin sebelum tanggal 1 November 2026!</p>
+    </div>
+    <div class="reward-grid hidden" id="rewardGridContainer">
+      <div class="glass-card reward-card bouncy"><div class="reward-img" style="background:#fef3c7; color:#d97706;">🍔</div><h4>Voucher Kantin</h4><p>Diskon Rp 5.000</p><button class="btn-redeem" onclick="tukarReward(300)">300 Pts</button></div>
+      <div class="glass-card reward-card bouncy"><div class="reward-img" style="background:#e0f2fe; color:#0284c7;">📱</div><h4>Pulsa / Data</h4><p>Pulsa Rp 10.000</p><button class="btn-redeem" onclick="tukarReward(800)">800 Pts</button></div>
+    </div>
+  </div>
+
+  <!-- 6. VIEW: PROFILE -->
+  <div id="viewProfile" class="screen-scroll hidden">
+    <div class="profile-header-large">
+      <div class="avatar-large">👤</div>
+      <h2 id="profName">Nama Siswa</h2>
+      <p id="profId">KULA-0000</p>
+    </div>
+    
+    <div class="glass-card profile-section">
+      <h3 data-i18n="personalInfoTitle">Informasi Pribadi</h3>
+      <div class="profile-row"><span data-i18n="lblSchool">Sekolah</span> <strong id="profSchool">-</strong></div>
+      <div class="profile-row"><span data-i18n="lblClass">Kelas</span> <strong id="profClass">-</strong></div>
+    </div>
+
+    <div class="glass-card profile-section" style="padding: 10px 20px;">
+      <div class="profile-row bouncy cursor-pointer" onclick="openSettingsView()" style="align-items:center;">
+        <span style="display:flex; align-items:center; gap:10px; color:var(--text-main); font-weight:600;"><i class="ph-fill ph-gear" style="font-size:20px; color:var(--brand-color);"></i> <span data-i18n="navSettings">Pengaturan App</span></span>
+        <i class="ph-bold ph-caret-right"></i>
+      </div>
+      <div class="profile-row bouncy cursor-pointer" onclick="openSettingsView('secHelpSection')" style="align-items:center;">
+        <span style="color:var(--text-main); font-weight:600;" data-i18n="navHelpAbout">Bantuan dan Tentang</span>
+        <i class="ph-bold ph-caret-right"></i>
+      </div>
+    </div>
+
+    <button class="btn-logout bouncy" id="btnLogout"><span data-i18n="btnLogout">Keluar Akun</span> <i class="ph-bold ph-sign-out"></i></button>
+  </div>
+
+  <!-- 7. VIEW: SETTINGS -->
+  <div id="viewSettings" class="screen-scroll hidden" style="z-index: 2500;">
+    <div class="page-header" style="display:flex; align-items:center; gap:15px;">
+      <button class="btn-close-dark bouncy" onclick="closeSettingsView()" style="background:var(--white); color:var(--text-main); border:1px solid #e2e8f0; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center;"><i class="ph-bold ph-arrow-left" style="font-size:18px;"></i></button>
+      <div>
+        <h2 style="font-size:20px;" data-i18n="settingsTitle">Pengaturan</h2>
+        <p data-i18n="settingsSub">Sesuaikan kenyamanan aplikasimu</p>
+      </div>
+    </div>
+
+    <!-- 1. PROFIL DAN AKUN -->
+    <h3 class="section-title" style="margin-top:15px;" data-i18n="secProfileAccount">Profil dan Akun</h3>
+    <div class="glass-card settings-group">
+      <div class="setting-item bouncy" onclick="openEditProfileModal()">
+        <div><strong data-i18n="editProfile">Edit Data Diri</strong><span data-i18n="editProfileSub">Ubah Nama, Sekolah, dan Kelas</span></div>
+        <i class="ph-bold ph-caret-right"></i>
+      </div>
+      <div class="setting-item bouncy" onclick="openChangePasswordModal()">
+        <div><strong data-i18n="changePass">Ubah Kata Sandi</strong><span data-i18n="changePassSub">Perbarui kata sandi akunmu</span></div>
+        <i class="ph-bold ph-caret-right"></i>
+      </div>
+    </div>
+
+    <!-- 2. NOTIFIKASI -->
+    <h3 class="section-title" data-i18n="secNotif">Notifikasi</h3>
+    <div class="glass-card settings-group">
+      <div class="setting-item">
+        <div><strong data-i18n="dailyNotif">Pengingat Scan Harian</strong><span data-i18n="dailyNotifSub">Notifikasi agar Streak-mu tetap aktif</span></div>
+        <label class="switch"><input type="checkbox" id="toggleNotif" checked onchange="toggleSetting('notif', this.checked)"><span class="slider"></span></label>
+      </div>
+      <div class="setting-item">
+        <div><strong data-i18n="rewardInfo">Info Musim Reward</strong><span data-i18n="rewardInfoSub">Pemberitahuan saat voucher dibuka</span></div>
+        <label class="switch"><input type="checkbox" id="toggleRewardInfo" checked onchange="toggleSetting('rewardInfo', this.checked)"><span class="slider"></span></label>
+      </div>
+    </div>
+
+    <!-- 3. TAMPILAN -->
+    <h3 class="section-title" data-i18n="secAppearance">Tampilan</h3>
+    <div class="glass-card settings-group">
+      <div class="setting-item">
+        <div><strong data-i18n="darkMode">Mode Gelap (Dark Mode)</strong><span data-i18n="darkModeSub">Ubah tema ke tampilan gelap</span></div>
+        <label class="switch"><input type="checkbox" id="toggleTheme" onchange="toggleDarkMode(this.checked)"><span class="slider"></span></label>
+      </div>
+      <div class="setting-item">
+        <div><strong data-i18n="soundScan">Suara Scanner (Bip)</strong><span data-i18n="soundScanSub">Efek suara saat scan berhasil</span></div>
+        <label class="switch"><input type="checkbox" id="toggleSound" checked onchange="toggleSetting('sound', this.checked)"><span class="slider"></span></label>
+      </div>
+    </div>
+
+    <!-- 4. PRIVASI DAN KEAMANAN -->
+    <h3 class="section-title" data-i18n="secPrivacy">Privasi dan Keamanan</h3>
+    <div class="glass-card settings-group">
+      <div class="setting-item">
+        <div><strong data-i18n="anonMode">Mode Anonim Leaderboard</strong><span data-i18n="anonModeSub">Sembunyikan nama di papan peringkat</span></div>
+        <label class="switch"><input type="checkbox" id="toggleAnon" onchange="toggleSetting('anon', this.checked)"><span class="slider"></span></label>
+      </div>
+      <div class="setting-item bouncy" onclick="clearAppCache()">
+        <div><strong style="color:#ef4444;" data-i18n="clearCache">Bersihkan Cache App</strong><span data-i18n="clearCacheSub">Hapus memori lokal sementara</span></div>
+        <i class="ph-bold ph-trash" style="color:#ef4444;"></i>
+      </div>
+    </div>
+
+    <!-- 5. BAHASA -->
+    <h3 class="section-title" data-i18n="secLang">Bahasa</h3>
+    <div class="glass-card settings-group">
+      <div class="setting-item">
+        <div><strong data-i18n="selectLangLabel">Pilih Bahasa</strong><span data-i18n="selectLangSub">Bahasa yang digunakan di app</span></div>
+        <select class="custom-select-small" id="selectLang" onchange="changeLanguage(this.value)">
+          <option value="id">Bahasa Indonesia</option>
+          <option value="en">English (US)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 6. BANTUAN DAN TENTANG -->
+    <h3 class="section-title" id="secHelpSection" data-i18n="secHelpAbout">Bantuan dan Tentang</h3>
+    <div class="glass-card settings-group">
+      <div class="setting-item bouncy" onclick="openWhatsAppCS()">
+        <div><strong data-i18n="waCs">Hubungi CS WhatsApp</strong><span data-i18n="waCsSub">Bantuan teknis & pertanyaan poin</span></div>
+        <i class="ph-bold ph-whatsapp-logo" style="color:#22c55e; font-size:20px;"></i>
+      </div>
+      <div class="setting-item">
+        <div><strong data-i18n="appVersion">Versi Aplikasi</strong><span>Sirkula Student App</span></div>
+        <span style="font-size:12px; font-weight:700; color:var(--brand-color);">v1.2.0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL EDIT PROFILE -->
+  <div id="modalEditProfile" class="modal-overlay hidden" style="z-index: 5500;">
+    <div class="modal-box glass-card" style="text-align:left;">
+      <h3 style="margin-bottom:15px; text-align:center;" data-i18n="editProfile">Edit Data Diri</h3>
+      <div class="form-group"><label data-i18n="lblFullName">Nama Lengkap</label><input type="text" id="editName"></div>
+      <div class="form-group"><label data-i18n="lblSchool">Asal Sekolah</label><input type="text" id="editSchool"></div>
+      <div class="form-group"><label data-i18n="lblClass">Kelas</label><input type="text" id="editClass"></div>
+      <div style="display:flex; gap:10px; margin-top:15px;">
+        <button class="btn-outline bouncy" style="flex:1;" onclick="el('modalEditProfile').classList.add('hidden')" data-i18n="btnCancel">Batal</button>
+        <button class="btn-primary bouncy" style="flex:1;" onclick="saveProfileEdit()" data-i18n="btnSave">Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL FORM UBAH KATA SANDI -->
+  <div id="modalChangePassword" class="modal-overlay hidden" style="z-index: 5600;">
+    <div class="modal-box glass-card" style="text-align:left;">
+      <h3 style="margin-bottom:15px; text-align:center;" data-i18n="changePass">Ubah Kata Sandi</h3>
+      <div class="form-group"><label data-i18n="lblOldPass">Kata Sandi Saat Ini</label><input type="password" id="inpOldPass" placeholder="••••••••"></div>
+      <div class="form-group"><label data-i18n="lblNewPass">Kata Sandi Baru</label><input type="password" id="inpNewPass" placeholder="Minimal 6 karakter"></div>
+      <div class="form-group"><label data-i18n="lblConfirmPass">Konfirmasi Kata Sandi Baru</label><input type="password" id="inpConfirmPass" placeholder="Ulangi kata sandi baru"></div>
+      <div style="display:flex; gap:10px; margin-top:15px;">
+        <button class="btn-outline bouncy" style="flex:1;" onclick="el('modalChangePassword').classList.add('hidden')" data-i18n="btnCancel">Batal</button>
+        <button class="btn-primary bouncy" style="flex:1;" onclick="submitChangePassword()" data-i18n="btnSendEmail">Kirim Konfirmasi</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL MANUAL SELECTION (MENGANTISIPASI BARCODE SAMPAH RUSAK/KUSUT) -->
+  <div id="modalManualInput" class="modal-overlay hidden" style="z-index: 5700;">
+    <div class="modal-box glass-card" style="text-align:left;">
+      <h3 style="margin-bottom:10px; text-align:center;">Setor Manual (Barcode Rusak)</h3>
+      <p style="font-size:11px; color:var(--text-muted); margin-bottom:15px; text-align:center;">Pilih kategori kemasan sampah yang kamu masukan:</p>
+      
+      <div class="form-group">
+        <label>Merek / Produsen FMCG</label>
+        <select id="manualBrand" class="custom-select-small" style="width:100%; padding:12px;">
+          <option value="Danone (Aqua/Mizone)">Danone (Aqua, Mizone)</option>
+          <option value="Nestlé (Milo/Bear Brand)">Nestlé (Milo, Bear Brand, Dancow)</option>
+          <option value="Indofood (Indomilk/Ichi Ocha)">Indofood (Indomilk, Club, Ichi Ocha)</option>
+
+          <option value="Mayora (Teh Pucuk/Le Minerale)">Mayora (Le Minerale, Teh Pucuk)</option>
+          <option value="Unilever (Buavita/Pepsodent)">Unilever (Buavita, Royco)</option>
+          <option value="ABC President (Nu Green Tea)">ABC President (Nu Green Tea)</option>
+          <option value="Lainnya / Generic">Merek Lainnya / Tanpa Merek</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Jenis Material Kemasan</label>
+        <select id="manualMaterial" class="custom-select-small" style="width:100%; padding:12px;">
+          <option value="Plastik PET (Botol Bening)">Plastik PET (Botol Bening)</option>
+          <option value="Kemasan Multilayer / Sachet">Kemasan Multilayer / Sachet (Flex)</option>
+          <option value="Plastik PP / Cup">Plastik PP (Gelas/Cup Plastik)</option>
+          <option value="Plastik HDPE (Tutup/Botol Tebal)">Plastik HDPE (Botol Tebal/Tutup)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Jumlah Unit Sampah</label>
+        <input type="number" id="manualQty" value="1" min="1" max="20" style="margin-bottom:10px;">
+      </div>
+
+      <div style="display:flex; gap:10px; margin-top:15px;">
+        <button class="btn-outline bouncy" style="flex:1;" onclick="el('modalManualInput').classList.add('hidden')">Batal</button>
+        <button class="btn-primary bouncy" style="flex:1;" onclick="processManualSetor()">Lanjut</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHARE CARD MODAL -->
+  <div id="modalShare" class="modal-overlay hidden" style="z-index: 6000;">
+    <div class="modal-box glass-card share-box">
+      <button class="btn-close-dark bouncy" onclick="el('modalShare').classList.add('hidden')" style="position:absolute; top:15px; right:15px; background:rgba(0,0,0,0.1); color:#000;">X</button>
+      <div id="shareContent" style="padding: 20px; background: linear-gradient(135deg, #d9f99d 0%, #84cc16 100%); border-radius: 20px; margin-top: 20px; color: #1a2e05;">
+        <h3 style="font-weight: 800; font-size: 24px; margin-bottom: 5px;">Sirkula Hero!</h3>
+        <p style="font-size: 12px; margin-bottom: 20px; opacity: 0.8;">Aku sudah menyelamatkan bumi bersama Sirkula.</p>
+        <div style="font-size: 60px; margin-bottom: 10px;" id="shareIcon">🌱</div>
+        <h2 id="shareTitle" style="font-size: 22px; margin-bottom: 15px;">Kula Starter</h2>
+        <div style="display: flex; justify-content: space-between; background: rgba(255,255,255,0.4); padding: 10px; border-radius: 12px;">
+          <div style="text-align: center;"><strong style="display:block; font-size: 18px;" id="sharePts">0</strong><span style="font-size: 10px;" data-i18n="statTotalPts">Poin</span></div>
+          <div style="text-align: center;"><strong style="display:block; font-size: 18px;" id="shareCarbon">0</strong><span style="font-size: 10px;">Kg CO2</span></div>
+        </div>
+      </div>
+      <button class="btn-primary bouncy" style="margin-top: 20px; background: #0f172a; color: white;" onclick="showToast('Berhasil disalin/dibagikan!', 'success'); el('modalShare').classList.add('hidden');" data-i18n="btnShareStory">Bagikan ke Story <i class="ph-bold ph-export"></i></button>
+    </div>
+  </div>
+
+  <!-- SCAN MODALS DENGAN VISUAL SCANNER INTERAKTIF & STATUS AUTO-FOCUS -->
+  <div id="modalLoading" class="modal-overlay hidden" style="z-index: 9999;"><div class="spinner"></div></div>
+  
+  <div id="modalScan" class="screen-full hidden" style="background: #000; z-index: 2000;">
+    <div class="scan-header">
+      <div style="display:flex; flex-direction:column;">
+        <span style="color:white; font-weight:600; font-size:14px;"><i class="ph-bold ph-scan" style="color:var(--brand-color);"></i> Pemindai Sampah EPR</span>
+        <span style="color:rgba(255,255,255,0.7); font-size:10px;" id="scanStatusText">Mencari titik fokus & barcode...</span>
+      </div>
+      <button id="btnCloseScan" class="btn-close-dark bouncy" data-i18n="btnCancel">Batal</button>
+    </div>
+
+    <!-- BINGKAI PEMINDAI DENGAN ANIMAIL GARIS LASER -->
+    <div class="scanner-overlay-box" id="scanFrameBox">
+      <div class="laser-line"></div>
+    </div>
+
+    <div id="reader" style="width: 100%; height: 100vh;"></div>
+
+    <!-- TOMBOL FALLBACK BARCODE KUSUT / RUSAK -->
+    <div style="position:fixed; bottom:30px; left:50%; transform:translateX(-50%); z-index:30; width:90%; max-width:360px;">
+      <button class="btn-outline bouncy" onclick="openManualInputFromScan()" style="background:rgba(15, 23, 42, 0.85); color:white; border:1px solid rgba(255,255,255,0.3); backdrop-filter:blur(10px); font-size:12px;">
+        <i class="ph-bold ph-warning-circle" style="color:#eab308; font-size:16px;"></i> Barcode Kusut/Rusak? Setor Manual
+      </button>
+    </div>
+  </div>
+
+  <!-- VIEW RESULT PRATINJAU DATA UNTUK EPR FMCG (PERMEN LHK P.75) -->
+  <div id="viewResult" class="screen-scroll hidden" style="z-index: 3000;">
+    <div class="glass-card result-card" style="margin-top: 30px; text-align:left;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <span style="background:var(--brand-light); color:#3f6212; padding:4px 10px; border-radius:12px; font-size:10px; font-weight:700;">EPR COMPLIANT (PERMEN LHK P.75)</span>
+        <span style="font-size:11px; color:var(--text-muted);" id="resTime">-</span>
+      </div>
+
+      <h3 id="resName" style="font-size: 18px; margin-bottom: 15px; font-weight:800;">Nama Produk</h3>
+      
+      <div class="res-row"><span>Produsen / Brand FMCG</span> <strong id="resFmcg" style="color:var(--brand-color);">-</strong></div>
+      <div class="res-row"><span>SKU / Barcode</span> <strong id="resSku">-</strong></div>
+      <div class="res-row"><span>Material Kemasan</span> <strong id="resJenis">-</strong></div>
+      <div class="res-row"><span>Jumlah Unit</span> <strong id="resQty">1 Unit</strong></div>
+      <div class="res-row"><span>Estimasi Berat Kemasan</span> <strong id="resWeight">18 Gram</strong></div>
+      <div class="res-row highlight"><span>Perolehan Poin</span> <strong id="resPoints">+15 Pts</strong></div>
+    </div>
+
+    <!-- TOMBOL SIMPAN DATA -->
+    <button class="btn-primary bouncy" id="btnSave" style="margin-top: 20px;">
+      Simpan Data EPR <i class="ph-bold ph-cloud-arrow-up"></i>
+    </button>
+    <button class="btn-outline bouncy" id="btnCancelScan" style="margin-top: 10px; border:none; background: rgba(0,0,0,0.05);" data-i18n="btnCancel">Batal</button>
+  </div>
+
+  <!-- BOTTOM NAVIGATION -->
+  <div class="bottom-nav hidden glass-nav" id="bottomNav">
+    <div class="nav-item active bouncy" data-target="viewHome"><i class="ph-fill ph-house"></i><span data-i18n="navHome">Home</span></div>
+    <div class="nav-item bouncy" data-target="viewRank"><i class="ph-fill ph-chart-bar"></i><span data-i18n="navRank">Rank</span></div>
+    <div class="nav-fab bouncy" id="btnScan"><i class="ph-bold ph-scan"></i></div>
+    <div class="nav-item bouncy" data-target="viewReward"><i class="ph-fill ph-gift"></i><span data-i18n="navReward">Reward</span></div>
+    <div class="nav-item bouncy" data-target="viewProfile"><i class="ph-fill ph-user"></i><span data-i18n="navProfile">Profile</span></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
