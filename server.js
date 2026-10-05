@@ -21,7 +21,7 @@ const SAMPAH_RATES = {
 };
 
 app.get('/', (req, res) => {
-  res.send('Server Sirkula AI Vision Backend Aktif! 🚀');
+  res.send('Server Sirkula AI Vision Backend Aktif! ');
 });
 
 app.post('/api/analyze-waste', async (req, res) => {
@@ -32,7 +32,8 @@ app.post('/api/analyze-waste', async (req, res) => {
       return res.status(400).json({ status: 'error', message: 'Gambar foto kemasan tidak ditemukan' });
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // Menggunakan model Gemini terbaru yang aktif & stabil
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const prompt = `
       Analisis foto kemasan sampah ini secara teliti untuk sistem waste tracking Sirkula.id:
@@ -118,10 +119,8 @@ app.post('/api/submit-waste', async (req, res) => {
   }
 });
 
-// PENTING UNTUK VERCEL SERVERLESS:
 module.exports = app;
 
-// Tetap jalankan app.listen jika dicoba lokal di laptop
 if (process.env.NODE_ENV !== 'production') {
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => console.log(`Sirkula AI Server running on port ${PORT}`));
