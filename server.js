@@ -32,53 +32,40 @@ app.post('/api/analyze-waste', async (req, res) => {
       return res.status(400).json({ status: 'error', message: 'Gambar foto kemasan tidak ditemukan' });
     }
 
-    let aiParsed = {
-      fmcg: "Produk Konsumen Umum",
-      namaProduk: "Kemasan Daur Ulang",
-      jenisMaterial: "PET Kotor",
-      jumlahUnit: 1
-    };
+    // Menggunakan teknologi Structured JSON Output resmi dari Gemini
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      generationConfig: { responseMimeType: "application/json" }
+    });
 
-    try {
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-      const prompt = `
-        Analisis foto kemasan sampah ini secara teliti untuk sistem waste tracking Sirkula.id:
-        1. Identifikasi Merek FMCG yang asli terlihat pada foto (contoh: Danone/Aqua, Indofood, Mayora, Unilever, Otsuka, Coca-Cola, ABC President, Nestle, Wings, dll). Jangan ditebak sembarangan, baca mereknya dari gambar.
-        2. Identifikasi Nama Produk Spesifik yang akurat (contoh: Aqua Botol 600ml, Teh Pucuk Harum 350ml, Indomie Goreng, Sprite, Sunlight, dll).
-        3. Klasifikasikan Jenis Material Sampah ke dalam SALAH SATU dari 4 kategori persis ini:
-           - "PET Bersih" (Botol plastik bening/transparan tanpa tutup dan tanpa label plastik).
-           - "PET Kotor" (Botol plastik bening/transparan yang masih ada label plastik atau tutupnya).
-           - "PET Warna" (Botol plastik berwarna seperti Sprite hijau, Pocari Sweat, Hydro Coco, Fanta).
-           - "LDPE > PP" (Kemasan sachet, kantong plastik, pouch minyak/sabun/snack multilayer).
-        4. Estimasi Jumlah Unit yang terlihat dalam foto (default minimal 1).
-        
-        KEMBALIKAN HANYA FORMAT JSON MENTAH TANPA MARKDOWN:
-        {
-          "fmcg": "Nama FMCG asli",
-          "namaProduk": "Nama Produk Spesifik asli",
-          "jenisMaterial": "PET Bersih | PET Kotor | PET Warna | LDPE > PP",
-          "jumlahUnit": 1
-        }
-      `;
-
-      const base64Clean = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-      const imageParts = [{ inlineData: { data: base64Clean, mimeType: "image/jpeg" } }];
-
-      const result = await model.generateContent([prompt, ...imageParts]);
-      const responseText = result.response.text().trim();
+    const prompt = `
+      Analisis foto kemasan sampah ini secara teliti untuk sistem waste tracking Sirkula.id:
+      1. Identifikasi Merek FMCG asli yang terlihat pada foto (contoh: Danone/Aqua, Indofood, Mayora, Unilever, Otsuka, Coca-Cola, ABC President, Nestle, Wings, dll).
+      2. Identifikasi Nama Produk Spesifik yang akurat (contoh: Aqua Botol 600ml, Teh Pucuk Harum 350ml, Indomie Goreng, Sprite, Sunlight, Pocari Sweat, dll).
+      3. Klasifikasikan Jenis Material Sampah ke dalam SALAH SATU dari 4 kategori persis ini:
+         - "PET Bersih" (Botol plastik bening/transparan tanpa tutup dan tanpa label plastik).
+         - "PET Kotor" (Botol plastik bening/transparan yang masih ada label plastik atau tutupnya).
+         - "PET Warna" (Botol plastik berwarna seperti Sprite hijau, Pocari Sweat, Hydro Coco, Fanta).
+         - "LDPE > PP" (Kemasan sachet, kantong plastik, pouch minyak/sabun/snack multilayer).
+      4. Estimasi Jumlah Unit yang terlihat dalam foto (default minimal 1).
       
-      // Ekstraksi JSON secara aman menggunakan Regex (mengabaikan teks tambahan AI)
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        if (parsed && parsed.fmcg) {
-          aiParsed = parsed;
-        }
+      Keluarkan hasil analisis dalam format JSON dengan struktur persis berikut:
+      {
+        "fmcg": "Nama FMCG asli",
+        "namaProduk": "Nama Produk Spesifik asli",
+        "jenisMaterial": "PET Bersih" atau "PET Kotor" atau "PET Warna" atau "LDPE > PP",
+        "jumlahUnit": 1
       }
-    } catch (aiErr) {
-      console.warn("AI Parsing Warning:", aiErr.message);
-    }
+    `;
+
+    const base64Clean = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+    const imageParts = [{ inlineData: { data: base64Clean, mimeType: "image/jpeg" } }];
+
+    const result = await model.generateContent([prompt, ...imageParts]);
+    const responseText = result.response.text().trim();
+    
+    // Karena menggunakan responseMimeType JSON, teks dijamin 100% format JSON valid
+    const aiParsed = JSON.parse(responseText);
 
     let finalMaterial = aiParsed.jenisMaterial || "PET Kotor";
     if (userToggleCondition === 'bersih' && finalMaterial === 'PET Kotor') {
@@ -86,7 +73,7 @@ app.post('/api/analyze-waste', async (req, res) => {
     }
 
     const rateInfo = SAMPAH_RATES[finalMaterial] || SAMPAH_RATES["PET Kotor"];
-    const qty = aiParsed.jumlahUnit || 1;
+    const qty = parseInt(aiParsed.jumlahUnit) || 1;
     const totalBeratGram = qty * rateInfo.defaultGram;
     const totalBeratKg = totalBeratGram / 1000;
     const totalPoin = Math.round(totalBeratKg * rateInfo.poinPerKg * 100) / 100;
@@ -106,7 +93,7 @@ app.post('/api/analyze-waste', async (req, res) => {
 
   } catch (err) {
     console.error("Server Critical Error:", err);
-    res.status(500).json({ status: 'error', message: err.message || 'Terjadi kesalahan pada server' });
+    res.status(500).json({ status: 'error', message: 'Gagal memproses AI: ' + err.message });
   }
 });
 
