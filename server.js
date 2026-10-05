@@ -49,8 +49,8 @@ app.post('/api/analyze-waste', async (req, res) => {
       "jumlahUnit": 1
     }`;
 
-    // Menggunakan Direct REST API Google Gemini (Bypass SDK error)
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    // Menggunakan Endpoint V1 produksi stabil dengan gemini-2.0-flash
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
     
     const geminiResponse = await fetch(geminiUrl, {
       method: 'POST',
