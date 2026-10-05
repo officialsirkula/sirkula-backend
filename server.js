@@ -21,6 +21,35 @@ app.get('/', (req, res) => {
   res.send('Server Sirkula AI Vision Backend Aktif! 🚀');
 });
 
+// Fungsi helper dengan Auto-Retry jika server Google sedang High Demand
+async function fetchGeminiWithRetry(url, payload, retries = 3, delay = 1500) {
+  for (let i = 0; i <= retries; i++) {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    
+    const data = await response.json();
+
+    if (response.ok) {
+      return data;
+    }
+
+    // Cek apakah error karena high demand / overloaded (503 / 429)
+    const errString = JSON.stringify(data);
+    const isHighDemand = response.status === 503 || response.status === 429 || errString.includes('high demand');
+
+    if (isHighDemand && i < retries) {
+      console.warn(`Gemini high demand detected, retrying attempt ${i + 1} in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+      continue;
+    }
+
+    throw new Error(data.error?.message || `Gagal menghubungi API Gemini (${response.status})`);
+  }
+}
+
 app.post('/api/analyze-waste', async (req, res) => {
   try {
     const { imageBase64, userCoords, userToggleCondition } = req.body;
@@ -49,32 +78,24 @@ app.post('/api/analyze-waste', async (req, res) => {
       "jumlahUnit": 1
     }`;
 
-    // Menggunakan gemini-3.8-flash sesuai permintaan langsung dari error Google API
     const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-3.8-flash:generateContent?key=${GEMINI_API_KEY}`;
     
-    const geminiResponse = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: promptText },
-            {
-              inline_data: {
-                mime_type: "image/jpeg",
-                data: base64Clean
-              }
+    const payload = {
+      contents: [{
+        parts: [
+          { text: promptText },
+          {
+            inline_data: {
+              mime_type: "image/jpeg",
+              data: base64Clean
             }
-          ]
-        }]
-      })
-    });
+          }
+        ]
+      }]
+    };
 
-    const geminiData = await geminiResponse.json();
-
-    if (!geminiResponse.ok) {
-      throw new Error(geminiData.error?.message || "Gagal menghubungi API Gemini");
-    }
+    // Panggil API dengan fitur auto-retry
+    const geminiData = await fetchGeminiWithRetry(geminiUrl, payload);
 
     const candidateText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
     const cleanJsonString = candidateText.replace(/```json/g, '').replace(/```/g, '').trim();
