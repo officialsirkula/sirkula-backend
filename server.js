@@ -1,6 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const app = express();
 
@@ -10,8 +9,6 @@ app.use(express.urlencoded({ limit: '15mb', extended: true }));
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzr2YFIfsp12S5G4iuoKd00gxZADa2BF93NhBCRijRCPX0s9vWVw6PYNI79efc1FU99Vg/exec";
-
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 const SAMPAH_RATES = {
   "PET Bersih": { hargaPerKg: 5000, poinPerKg: 3500, pcsPerKg: 50, defaultGram: 20 },
@@ -32,37 +29,57 @@ app.post('/api/analyze-waste', async (req, res) => {
       return res.status(400).json({ status: 'error', message: 'Gambar foto kemasan tidak ditemukan' });
     }
 
-    // Menggunakan model Gemini 2.0 Flash terbaru yang stabil
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
-    const prompt = `
-      Analisis foto kemasan sampah ini secara teliti untuk sistem waste tracking Sirkula.id:
-      1. Identifikasi Merek FMCG asli yang terlihat pada foto (contoh: Danone/Aqua, Indofood, Mayora, Unilever, Otsuka, Coca-Cola, ABC President, Nestle, Wings, dll).
-      2. Identifikasi Nama Produk Spesifik yang akurat (contoh: Aqua Botol 600ml, Teh Pucuk Harum 350ml, Indomie Goreng, Sprite, Sunlight, Pocari Sweat, dll).
-      3. Klasifikasikan Jenis Material Sampah ke dalam SALAH SATU dari 4 kategori persis ini:
-         - "PET Bersih" (Botol plastik bening/transparan tanpa tutup dan tanpa label plastik).
-         - "PET Kotor" (Botol plastik bening/transparan yang masih ada label plastik atau tutupnya).
-         - "PET Warna" (Botol plastik berwarna seperti Sprite hijau, Pocari Sweat, Hydro Coco, Fanta).
-         - "LDPE > PP" (Kemasan sachet, kantong plastik, pouch minyak/sabun/snack multilayer).
-      4. Estimasi Jumlah Unit yang terlihat dalam foto (default minimal 1).
-      
-      Kembalikan HANYA format JSON valid tanpa teks atau tanda markdown lainnya:
-      {
-        "fmcg": "Nama FMCG asli",
-        "namaProduk": "Nama Produk Spesifik asli",
-        "jenisMaterial": "PET Bersih | PET Kotor | PET Warna | LDPE > PP",
-        "jumlahUnit": 1
-      }
-    `;
-
     const base64Clean = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-    const imageParts = [{ inlineData: { data: base64Clean, mimeType: "image/jpeg" } }];
 
-    const result = await model.generateContent([prompt, ...imageParts]);
-    const responseText = result.response.text().trim();
+    const promptText = `Analisis foto kemasan sampah ini secara teliti untuk sistem waste tracking Sirkula.id:
+    1. Identifikasi Merek FMCG asli yang terlihat pada foto (contoh: Danone/Aqua, Indofood, Mayora, Unilever, Otsuka, Coca-Cola, ABC President, Nestle, Wings, dll).
+    2. Identifikasi Nama Produk Spesifik yang akurat (contoh: Aqua Botol 600ml, Teh Pucuk Harum 350ml, Indomie Goreng, Sprite, Sunlight, Pocari Sweat, dll).
+    3. Klasifikasikan Jenis Material Sampah ke dalam SALAH SATU dari 4 kategori persis ini:
+       - "PET Bersih" (Botol plastik bening/transparan tanpa tutup dan tanpa label plastik).
+       - "PET Kotor" (Botol plastik bening/transparan yang masih ada label plastik atau tutupnya).
+       - "PET Warna" (Botol plastik berwarna seperti Sprite hijau, Pocari Sweat, Hydro Coco, Fanta).
+       - "LDPE > PP" (Kemasan sachet, kantong plastik, pouch minyak/sabun/snack multilayer).
+    4. Estimasi Jumlah Unit yang terlihat dalam foto (default minimal 1).
     
-    // Ekstraksi JSON secara aman
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    Keluarkan hasil analisis HANYA dalam format JSON mentah tanpa markdown:
+    {
+      "fmcg": "Nama FMCG asli",
+      "namaProduk": "Nama Produk Spesifik asli",
+      "jenisMaterial": "PET Bersih | PET Kotor | PET Warna | LDPE > PP",
+      "jumlahUnit": 1
+    }`;
+
+    // Menggunakan Direct REST API Google Gemini (Bypass SDK error)
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    
+    const geminiResponse = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: promptText },
+            {
+              inline_data: {
+                mime_type: "image/jpeg",
+                data: base64Clean
+              }
+            }
+          ]
+        }]
+      })
+    });
+
+    const geminiData = await geminiResponse.json();
+
+    if (!geminiResponse.ok) {
+      throw new Error(geminiData.error?.message || "Gagal menghubungi API Gemini");
+    }
+
+    const candidateText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    const cleanJsonString = candidateText.replace(/```json/g, '').replace(/```/g, '').trim();
+    const jsonMatch = cleanJsonString.match(/\{[\s\S]*\}/);
+
     let aiParsed = {
       fmcg: "Produk Konsumen Umum",
       namaProduk: "Kemasan Daur Ulang",
@@ -72,8 +89,7 @@ app.post('/api/analyze-waste', async (req, res) => {
 
     if (jsonMatch) {
       try {
-        const parsed = JSON.parse(jsonMatch[0]);
-        if (parsed && parsed.fmcg) aiParsed = parsed;
+        aiParsed = JSON.parse(jsonMatch[0]);
       } catch (e) {}
     }
 
