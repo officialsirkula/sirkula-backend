@@ -33,31 +33,30 @@ app.post('/api/analyze-waste', async (req, res) => {
     }
 
     let aiParsed = {
-      fmcg: "Pocari Sweat (Amerta Indah Otsuka)",
-      namaProduk: "Pocari Sweat Botol 500ml",
-      jenisMaterial: "PET Warna",
+      fmcg: "Produk Konsumen Umum",
+      namaProduk: "Kemasan Daur Ulang",
+      jenisMaterial: "PET Kotor",
       jumlahUnit: 1
     };
 
     try {
-      // Menggunakan gemini-1.5-flash yang paling stabil di SDK Vercel
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
       const prompt = `
         Analisis foto kemasan sampah ini secara teliti untuk sistem waste tracking Sirkula.id:
-        1. Identifikasi Merek FMCG (contoh: Danone, Indofood, Mayora, Unilever, Otsuka, dll).
-        2. Identifikasi Nama Produk Spesifik (contoh: Aqua Botol 600ml, Pocari Sweat, Indomie Goreng, dll).
+        1. Identifikasi Merek FMCG yang asli terlihat pada foto (contoh: Danone/Aqua, Indofood, Mayora, Unilever, Otsuka, Coca-Cola, ABC President, Nestle, Wings, dll). Jangan ditebak sembarangan, baca mereknya dari gambar.
+        2. Identifikasi Nama Produk Spesifik yang akurat (contoh: Aqua Botol 600ml, Teh Pucuk Harum 350ml, Indomie Goreng, Sprite, Sunlight, dll).
         3. Klasifikasikan Jenis Material Sampah ke dalam SALAH SATU dari 4 kategori persis ini:
            - "PET Bersih" (Botol plastik bening/transparan tanpa tutup dan tanpa label plastik).
            - "PET Kotor" (Botol plastik bening/transparan yang masih ada label plastik atau tutupnya).
-           - "PET Warna" (Botol plastik berwarna seperti Sprite hijau, Pocari Sweat, Hydro Coco).
+           - "PET Warna" (Botol plastik berwarna seperti Sprite hijau, Pocari Sweat, Hydro Coco, Fanta).
            - "LDPE > PP" (Kemasan sachet, kantong plastik, pouch minyak/sabun/snack multilayer).
         4. Estimasi Jumlah Unit yang terlihat dalam foto (default minimal 1).
         
-        Kembalikan HANYA format JSON valid tanpa tanda markdown:
+        KEMBALIKAN HANYA FORMAT JSON MENTAH TANPA MARKDOWN:
         {
-          "fmcg": "Nama FMCG",
-          "namaProduk": "Nama Produk Spesifik",
+          "fmcg": "Nama FMCG asli",
+          "namaProduk": "Nama Produk Spesifik asli",
           "jenisMaterial": "PET Bersih | PET Kotor | PET Warna | LDPE > PP",
           "jumlahUnit": 1
         }
@@ -68,24 +67,25 @@ app.post('/api/analyze-waste', async (req, res) => {
 
       const result = await model.generateContent([prompt, ...imageParts]);
       const responseText = result.response.text().trim();
-      const cleanJsonString = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
       
-      const parsed = JSON.parse(cleanJsonString);
-      if (parsed && parsed.fmcg) {
-        aiParsed = parsed;
+      // Ekstraksi JSON secara aman menggunakan Regex (mengabaikan teks tambahan AI)
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (parsed && parsed.fmcg) {
+          aiParsed = parsed;
+        }
       }
     } catch (aiErr) {
-      console.warn("Gemini API Warning / Fallback triggered:", aiErr.message);
-      // Fallback otomatis jika AI mengalami kendala jaringan/timeout, 
-      // sistem tetap mengenali botol yang biasa kamu foto (seperti Pocari Sweat / PET Warna)
+      console.warn("AI Parsing Warning:", aiErr.message);
     }
 
-    let finalMaterial = aiParsed.jenisMaterial || "PET Warna";
+    let finalMaterial = aiParsed.jenisMaterial || "PET Kotor";
     if (userToggleCondition === 'bersih' && finalMaterial === 'PET Kotor') {
       finalMaterial = 'PET Bersih';
     }
 
-    const rateInfo = SAMPAH_RATES[finalMaterial] || SAMPAH_RATES["PET Warna"];
+    const rateInfo = SAMPAH_RATES[finalMaterial] || SAMPAH_RATES["PET Kotor"];
     const qty = aiParsed.jumlahUnit || 1;
     const totalBeratGram = qty * rateInfo.defaultGram;
     const totalBeratKg = totalBeratGram / 1000;
@@ -94,12 +94,12 @@ app.post('/api/analyze-waste', async (req, res) => {
     res.json({
       status: 'success',
       data: {
-        fmcg: aiParsed.fmcg || "Pocari Sweat (Amerta Indah Otsuka)",
-        namaProduk: aiParsed.namaProduk || "Pocari Sweat Botol 500ml",
+        fmcg: aiParsed.fmcg || "Produk Konsumen Umum",
+        namaProduk: aiParsed.namaProduk || "Kemasan Daur Ulang",
         jenisMaterial: finalMaterial,
         jumlahUnit: qty,
         beratGram: totalBeratGram,
-        poin: totalPoin > 0 ? totalPoin : 15,
+        poin: totalPoin > 0 ? totalPoin : 10,
         location: userCoords || { lat: null, lng: null }
       }
     });
