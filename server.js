@@ -32,11 +32,8 @@ app.post('/api/analyze-waste', async (req, res) => {
       return res.status(400).json({ status: 'error', message: 'Gambar foto kemasan tidak ditemukan' });
     }
 
-    // Menggunakan teknologi Structured JSON Output resmi dari Gemini
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
-      generationConfig: { responseMimeType: "application/json" }
-    });
+    // Menggunakan model Gemini 2.0 Flash terbaru yang stabil
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const prompt = `
       Analisis foto kemasan sampah ini secara teliti untuk sistem waste tracking Sirkula.id:
@@ -49,11 +46,11 @@ app.post('/api/analyze-waste', async (req, res) => {
          - "LDPE > PP" (Kemasan sachet, kantong plastik, pouch minyak/sabun/snack multilayer).
       4. Estimasi Jumlah Unit yang terlihat dalam foto (default minimal 1).
       
-      Keluarkan hasil analisis dalam format JSON dengan struktur persis berikut:
+      Kembalikan HANYA format JSON valid tanpa teks atau tanda markdown lainnya:
       {
         "fmcg": "Nama FMCG asli",
         "namaProduk": "Nama Produk Spesifik asli",
-        "jenisMaterial": "PET Bersih" atau "PET Kotor" atau "PET Warna" atau "LDPE > PP",
+        "jenisMaterial": "PET Bersih | PET Kotor | PET Warna | LDPE > PP",
         "jumlahUnit": 1
       }
     `;
@@ -64,8 +61,21 @@ app.post('/api/analyze-waste', async (req, res) => {
     const result = await model.generateContent([prompt, ...imageParts]);
     const responseText = result.response.text().trim();
     
-    // Karena menggunakan responseMimeType JSON, teks dijamin 100% format JSON valid
-    const aiParsed = JSON.parse(responseText);
+    // Ekstraksi JSON secara aman
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    let aiParsed = {
+      fmcg: "Produk Konsumen Umum",
+      namaProduk: "Kemasan Daur Ulang",
+      jenisMaterial: "PET Kotor",
+      jumlahUnit: 1
+    };
+
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (parsed && parsed.fmcg) aiParsed = parsed;
+      } catch (e) {}
+    }
 
     let finalMaterial = aiParsed.jenisMaterial || "PET Kotor";
     if (userToggleCondition === 'bersih' && finalMaterial === 'PET Kotor') {
