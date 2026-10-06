@@ -2,11 +2,12 @@ const express = require('express');
 const cors = require('cors');
 
 const app = express();
+
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ limit: '15mb', extended: true }));
 
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzr2YFIfsp12S5G4iuoKd00gxZADa2BF93NhBCRijRCPX0s9vWVw6PYNI79efc1FU99Vg/exec";
 
 const SAMPAH_RATES = {
@@ -16,72 +17,68 @@ const SAMPAH_RATES = {
   "PET Warna":  { poinPerKg: 560,  defaultGram: 20 }
 };
 
-app.get('/', (req, res) => res.send('Server Sirkula Groq AI Vision Aktif! 🚀'));
+app.get('/', (req, res) => {
+  res.send('Server Sirkula AI Vision Backend Aktif! 🚀');
+});
 
 app.post('/api/analyze-waste', async (req, res) => {
   try {
     const { imageBase64, userCoords, userToggleCondition } = req.body;
-    if (!imageBase64) return res.status(400).json({ status: 'error', message: 'Gambar tidak ditemukan' });
+
+    if (!imageBase64) {
+      return res.status(400).json({ status: 'error', message: 'Gambar foto kemasan tidak ditemukan' });
+    }
 
     const base64Clean = imageBase64.replace(/^data:image\/\w+;base64,/, "");
 
-    const promptText = `Tugasmu adalah menganalisis botol/kemasan sampah di foto ini secara akurat:
-    1. Baca dan Identifikasi Merek FMCG (contoh: Danone/Aqua, Indofood, Unilever, Mayora, Otsuka).
-    2. Baca Nama Produk Spesifik (contoh: Aqua Botol 600ml, Teh Pucuk Harum, Indomie Goreng).
-    3. Klasifikasikan Material: pilih HANYA salah satu ("PET Bersih", "PET Kotor", "PET Warna", "LDPE > PP").
-    4. Estimasi Jumlah Unit yang terlihat di foto.
+    const promptText = `Tugasmu adalah menganalisis foto sampah ini secara akurat berdasarkan apa yang benar-benar kamu lihat:
+    1. Identifikasi Merek FMCG asli (contoh: Danone/Aqua, Indofood, Mayora, Unilever, Otsuka).
+    2. Identifikasi Nama Produk Spesifik (contoh: Aqua Botol 600ml, Teh Pucuk Harum, Indomie Goreng).
+    3. Klasifikasikan Material (PILIH SATU SAJA): "PET Bersih", "PET Kotor", "PET Warna", atau "LDPE > PP".
+    4. Estimasi Jumlah Unit yang terlihat dalam foto.
     
-    KELUARKAN HANYA BENTUK JSON MENTAH TANPA MARKDOWN, TANPA PENJELASAN LAIN. CONTOH:
-    {"fmcg":"Nama Merek", "namaProduk":"Nama Produk", "jenisMaterial":"PET Kotor", "jumlahUnit":1}`;
+    KELUARKAN HANYA FORMAT JSON MENTAH TANPA MARKDOWN:
+    {
+      "fmcg": "Nama FMCG",
+      "namaProduk": "Nama Produk",
+      "jenisMaterial": "PET Kotor",
+      "jumlahUnit": 1
+    }`;
 
-    const groqUrl = 'https://api.groq.com/openai/v1/chat/completions';
+    // Menggunakan model Gemini 1.5 Flash resmi (sangat akurat baca teks)
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
     
-    // Menggunakan model 11B yang terbuka untuk akses publik/gratis
-    const groqResponse = await fetch(groqUrl, {
+    const geminiResponse = await fetch(geminiUrl, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${GROQ_API_KEY}`
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: "llama-3.2-11b-vision-preview",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: promptText },
-              { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Clean}` } }
-            ]
-          }
-        ],
-        temperature: 0.1
+        contents: [{
+          parts: [
+            { text: promptText },
+            { inline_data: { mime_type: "image/jpeg", data: base64Clean } }
+          ]
+        }]
       })
     });
 
-    const groqData = await groqResponse.json();
+    const geminiData = await geminiResponse.json();
 
-    if (!groqResponse.ok) {
-      throw new Error(groqData.error?.message || "Gagal menghubungi server Groq AI");
+    // Jika kuota habis, lebih baik jujur minta input manual daripada ngasih data acak yang salah
+    if (!geminiResponse.ok) {
+      console.warn("API Error:", geminiData.error?.message);
+      return res.status(429).json({ 
+        status: 'error', 
+        message: 'AI sedang sibuk atau kuota habis. Silakan klik "Batal" dan gunakan form Setor Manual.' 
+      });
     }
 
-    const candidateText = groqData.choices?.[0]?.message?.content || "{}";
+    const candidateText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
     const cleanJsonString = candidateText.replace(/```json/g, '').replace(/```/g, '').trim();
     const jsonMatch = cleanJsonString.match(/\{[\s\S]*\}/);
 
-    let aiParsed = {
-      fmcg: "Produk Konsumen Umum",
-      namaProduk: "Kemasan Daur Ulang",
-      jenisMaterial: "PET Kotor",
-      jumlahUnit: 1
-    };
+    if (!jsonMatch) throw new Error("Format AI tidak terbaca");
 
-    if (jsonMatch) {
-      try {
-        aiParsed = JSON.parse(jsonMatch[0]);
-      } catch (e) {
-        console.warn("Gagal parse JSON:", e);
-      }
-    }
+    const aiParsed = JSON.parse(jsonMatch[0]);
 
     let finalMaterial = aiParsed.jenisMaterial || "PET Kotor";
     if (userToggleCondition === 'bersih' && finalMaterial === 'PET Kotor') {
@@ -96,7 +93,7 @@ app.post('/api/analyze-waste', async (req, res) => {
     res.json({
       status: 'success',
       data: {
-        fmcg: aiParsed.fmcg || "Produk Konsumen Umum",
+        fmcg: aiParsed.fmcg || "Produk Konsumen",
         namaProduk: aiParsed.namaProduk || "Kemasan Daur Ulang",
         jenisMaterial: finalMaterial,
         jumlahUnit: qty,
@@ -107,8 +104,8 @@ app.post('/api/analyze-waste', async (req, res) => {
     });
 
   } catch (err) {
-    console.error("Server Critical Error:", err);
-    res.status(500).json({ status: 'error', message: 'Gagal memproses AI: ' + err.message });
+    console.error("Server Error:", err);
+    res.status(500).json({ status: 'error', message: 'Gagal memproses gambar. Pastikan foto jelas.' });
   }
 });
 
@@ -130,5 +127,5 @@ app.post('/api/submit-waste', async (req, res) => {
 
 module.exports = app;
 if (process.env.NODE_ENV !== 'production') {
-  app.listen(3000, () => console.log(`Sirkula Groq Server running`));
+  app.listen(3000, () => console.log(`Sirkula Server running`));
 }
