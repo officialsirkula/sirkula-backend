@@ -36,7 +36,7 @@ app.post('/api/analyze-waste', async (req, res) => {
 
     const groqUrl = 'https://api.groq.com/openai/v1/chat/completions';
     
-    // Memanggil model Vision Llama 3.2 terbaru via server Groq yang super cepat
+    // Menggunakan nama model Llama 3.2 Vision versi stabil (tanpa -preview)
     const groqResponse = await fetch(groqUrl, {
       method: 'POST',
       headers: { 
@@ -44,7 +44,7 @@ app.post('/api/analyze-waste', async (req, res) => {
         'Authorization': `Bearer ${GROQ_API_KEY}`
       },
       body: JSON.stringify({
-        model: "llama-3.2-90b-vision-preview",
+        model: "llama-3.2-90b-vision",
         messages: [
           {
             role: "user",
