@@ -36,7 +36,7 @@ app.post('/api/analyze-waste', async (req, res) => {
 
     const groqUrl = 'https://api.groq.com/openai/v1/chat/completions';
     
-    // Menggunakan nama model Llama 3.2 Vision versi stabil (tanpa -preview)
+    // Menggunakan model 11B yang terbuka untuk akses publik/gratis
     const groqResponse = await fetch(groqUrl, {
       method: 'POST',
       headers: { 
@@ -44,7 +44,7 @@ app.post('/api/analyze-waste', async (req, res) => {
         'Authorization': `Bearer ${GROQ_API_KEY}`
       },
       body: JSON.stringify({
-        model: "llama-3.2-90b-vision",
+        model: "llama-3.2-11b-vision-preview",
         messages: [
           {
             role: "user",
